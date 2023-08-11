@@ -151,10 +151,14 @@ return {
         "python",
         "query",
         "regex",
-        "tsx",
         "typescript",
         "vim",
         "yaml",
+        "golang",
+        "cpp",
+        "c",
+        "objc",
+        "go",
       },
     },
   },
@@ -263,4 +267,45 @@ return {
       })
     end,
   },
+
+  -- mini surround
+  {
+    "echasnovski/mini.surround",
+    opts = {
+      mappings = {
+        add = "gsa",
+        delete = "gsd",
+        find = "gsf",
+        find_left = "gsF",
+        highlight = "gsh",
+        replace = "gsr",
+        update_n_lines = "gsn",
+      },
+    },
+  },
+  
+  -- tokyonight
+  {
+    "folke/tokyonight.nvim",
+    opts = {
+      transparent = true,
+      styles = {
+        sidebars = "transparent",
+        floats = "transparent",
+      },
+    },
+  },
+
+  --lspconfig 
+  {
+    "neovim/nvim-lspconfig",
+    opts = {
+      setup = {
+        clangd = function(_, opts)
+          opts.capabilities.offsetEncoding = { "utf-16" }
+        end,
+      },
+    },
+  },
+  
 }
