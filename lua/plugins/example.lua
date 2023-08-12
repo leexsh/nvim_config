@@ -116,6 +116,87 @@ return {
       servers = {
         -- tsserver will be automatically installed with mason and loaded with lspconfig
         tsserver = {},
+        neocmake = {},
+        pyright = {},
+        ruff_lsp = {},
+        gopls = {
+          keys = {
+            -- Workaround for the lack of a DAP strategy in neotest-go: https://github.com/nvim-neotest/neotest-go/issues/12
+            { "<leader>td", "<cmd>lua require('dap-go').debug_test()<CR>", desc = "Debug Nearest (Go)" },
+          },
+          settings = {
+            gopls = {
+              gofumpt = true,
+              codelenses = {
+                gc_details = false,
+                generate = true,
+                regenerate_cgo = true,
+                run_govulncheck = true,
+                test = true,
+                tidy = true,
+                upgrade_dependency = true,
+                vendor = true,
+              },
+              hints = {
+                assignVariableTypes = true,
+                compositeLiteralFields = true,
+                compositeLiteralTypes = true,
+                constantValues = true,
+                functionTypeParameters = true,
+                parameterNames = true,
+                rangeVariableTypes = true,
+              },
+              analyses = {
+                fieldalignment = true,
+                nilness = true,
+                unusedparams = true,
+                unusedwrite = true,
+                useany = true,
+              },
+              usePlaceholders = true,
+              completeUnimported = true,
+              staticcheck = true,
+              directoryFilters = { "-.git", "-.vscode", "-.idea", "-.vscode-test", "-node_modules" },
+              semanticTokens = true,
+            },
+          },
+        },
+
+        clangd = {
+          keys = {
+            { "<leader>cR", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
+          },
+          root_dir = function(fname)
+            return require("lspconfig.util").root_pattern(
+              "Makefile",
+              "configure.ac",
+              "configure.in",
+              "config.h.in",
+              "meson.build",
+              "meson_options.txt",
+              "build.ninja"
+            )(fname) or require("lspconfig.util").root_pattern("compile_commands.json", "compile_flags.txt")(
+              fname
+            ) or require("lspconfig.util").find_git_ancestor(fname)
+          end,
+          capabilities = {
+            offsetEncoding = { "utf-16" },
+          },
+          cmd = {
+            "clangd",
+            "--background-index",
+            "--clang-tidy",
+            "--header-insertion=iwyu",
+            "--completion-style=detailed",
+            "--function-arg-placeholders",
+            "--fallback-style=llvm",
+          },
+          init_options = {
+            usePlaceholders = true,
+            completeUnimported = true,
+            clangdFileStatus = true,
+          },
+        },
       },
       -- you can do any additional lsp server setup here
       -- return true if you don't want this server to be setup with lspconfig
@@ -126,8 +207,41 @@ return {
           require("typescript").setup({ server = opts })
           return true
         end,
+        ruff_lsp = function()
+          require("lazyvim.util").on_attach(function(client, _)
+            if client.name == "ruff_lsp" then
+              -- Disable hover in favor of Pyright
+              client.server_capabilities.hoverProvider = false
+            end
+          end)
+        end,
         -- Specify * to use this function as a fallback for any server
         -- ["*"] = function(server, opts) end,
+        clangd = function(_, opts)
+          local clangd_ext_opts = require("lazyvim.util").opts("clangd_extensions.nvim")
+          require("clangd_extensions").setup(vim.tbl_deep_extend("force", clangd_ext_opts or {}, { server = opts }))
+          return true
+        end,
+        gopls = function(_, opts)
+          -- workaround for gopls not supporting semanticTokensProvider
+          -- https://github.com/golang/go/issues/54531#issuecomment-1464982242
+          require("lazyvim.util").on_attach(function(client, _)
+            if client.name == "gopls" then
+              if not client.server_capabilities.semanticTokensProvider then
+                local semantic = client.config.capabilities.textDocument.semanticTokens
+                client.server_capabilities.semanticTokensProvider = {
+                  full = true,
+                  legend = {
+                    tokenTypes = semantic.tokenTypes,
+                    tokenModifiers = semantic.tokenModifiers,
+                  },
+                  range = true,
+                }
+              end
+            end
+          end)
+          -- end workaround
+        end,
       },
     },
   },
@@ -159,6 +273,10 @@ return {
         "c",
         "objc",
         "go",
+        "cmake",
+        "gomod",
+        "gowork",
+        "gosum",
       },
     },
   },
@@ -308,4 +426,319 @@ return {
     },
   },
   
+  -- neo tree
+  {
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    cmd = "Neotree",
+    keys = {
+      {
+        "<leader>fe",
+        function()
+          require("neo-tree.command").execute({ toggle = true, dir = require("lazyvim.util").get_root() })
+        end,
+        desc = "Explorer NeoTree (root dir)",
+      },
+      {
+        "<leader>fE",
+        function()
+          require("neo-tree.command").execute({ toggle = true, dir = vim.loop.cwd() })
+        end,
+        desc = "Explorer NeoTree (cwd)",
+      },
+      { "<leader>e", "<leader>fe", desc = "Explorer NeoTree (root dir)", remap = true },
+      { "<leader>E", "<leader>fE", desc = "Explorer NeoTree (cwd)", remap = true },
+    },
+    deactivate = function()
+      vim.cmd([[Neotree close]])
+    end,
+    init = function()
+      if vim.fn.argc() == 1 then
+        local stat = vim.loop.fs_stat(vim.fn.argv(0))
+        if stat and stat.type == "directory" then
+          require("neo-tree")
+        end
+      end
+    end,
+    opts = {
+      sources = { "filesystem", "buffers", "git_status", "document_symbols" },
+      open_files_do_not_replace_types = { "terminal", "Trouble", "qf", "Outline" },
+      filesystem = {
+        bind_to_cwd = false,
+        follow_current_file = { enabled = true },
+        use_libuv_file_watcher = true,
+      },
+      window = {
+        mappings = {
+          ["<space>"] = "none",
+        },
+      },
+      default_component_configs = {
+        indent = {
+          with_expanders = true, -- if nil and file nesting is enabled, will enable expanders
+          expander_collapsed = "",
+          expander_expanded = "",
+          expander_highlight = "NeoTreeExpander",
+        },
+      },
+    },
+    config = function(_, opts)
+      require("neo-tree").setup(opts)
+      vim.api.nvim_create_autocmd("TermClose", {
+        pattern = "*lazygit",
+        callback = function()
+          if package.loaded["neo-tree.sources.git_status"] then
+            require("neo-tree.sources.git_status").refresh()
+          end
+        end,
+      })
+    end,
+  },
+
+  {
+    "nvim-pack/nvim-spectre",
+    cmd = "Spectre",
+    opts = { open_cmd = "noswapfile vnew" },
+    -- stylua: ignore
+    keys = {
+      { "<leader>sr", function() require("spectre").open() end, desc = "Replace in files (Spectre)" },
+    },
+  },
+
+  {
+    "RRethy/vim-illuminate",
+    event = { "BufReadPost", "BufNewFile" },
+    opts = {
+      delay = 200,
+      large_file_cutoff = 2000,
+      large_file_overrides = {
+        providers = { "lsp" },
+      },
+    },
+    config = function(_, opts)
+      require("illuminate").configure(opts)
+  
+      local function map(key, dir, buffer)
+        vim.keymap.set("n", key, function()
+          require("illuminate")["goto_" .. dir .. "_reference"](false)
+        end, { desc = dir:sub(1, 1):upper() .. dir:sub(2) .. " Reference", buffer = buffer })
+      end
+  
+      map("]]", "next")
+      map("[[", "prev")
+  
+      -- also set it after loading ftplugins, since a lot overwrite [[ and ]]
+      vim.api.nvim_create_autocmd("FileType", {
+        callback = function()
+          local buffer = vim.api.nvim_get_current_buf()
+          map("]]", "next", buffer)
+          map("[[", "prev", buffer)
+        end,
+      })
+    end,
+    keys = {
+      { "]]", desc = "Next Reference" },
+      { "[[", desc = "Prev Reference" },
+    },
+  },
+
+  {
+    "lewis6991/gitsigns.nvim",
+    event = { "BufReadPre", "BufNewFile" },
+    opts = {
+      signs = {
+        add = { text = "▎" },
+        change = { text = "▎" },
+        delete = { text = "" },
+        topdelete = { text = "" },
+        changedelete = { text = "▎" },
+        untracked = { text = "▎" },
+      },
+      on_attach = function(buffer)
+        local gs = package.loaded.gitsigns
+  
+        local function map(mode, l, r, desc)
+          vim.keymap.set(mode, l, r, { buffer = buffer, desc = desc })
+        end
+  
+        -- stylua: ignore start
+        map("n", "]h", gs.next_hunk, "Next Hunk")
+        map("n", "[h", gs.prev_hunk, "Prev Hunk")
+        map({ "n", "v" }, "<leader>ghs", ":Gitsigns stage_hunk<CR>", "Stage Hunk")
+        map({ "n", "v" }, "<leader>ghr", ":Gitsigns reset_hunk<CR>", "Reset Hunk")
+        map("n", "<leader>ghS", gs.stage_buffer, "Stage Buffer")
+        map("n", "<leader>ghu", gs.undo_stage_hunk, "Undo Stage Hunk")
+        map("n", "<leader>ghR", gs.reset_buffer, "Reset Buffer")
+        map("n", "<leader>ghp", gs.preview_hunk, "Preview Hunk")
+        map("n", "<leader>ghb", function() gs.blame_line({ full = true }) end, "Blame Line")
+        map("n", "<leader>ghd", gs.diffthis, "Diff This")
+        map("n", "<leader>ghD", function() gs.diffthis("~") end, "Diff This ~")
+        map({ "o", "x" }, "ih", ":<C-U>Gitsigns select_hunk<CR>", "GitSigns Select Hunk")
+      end,
+    },
+  },
+
+  {
+    "folke/todo-comments.nvim",
+    cmd = { "TodoTrouble", "TodoTelescope" },
+    event = { "BufReadPost", "BufNewFile" },
+    config = true,
+    -- stylua: ignore
+    keys = {
+      { "]t", function() require("todo-comments").jump_next() end, desc = "Next todo comment" },
+      { "[t", function() require("todo-comments").jump_prev() end, desc = "Previous todo comment" },
+      { "<leader>xt", "<cmd>TodoTrouble<cr>", desc = "Todo (Trouble)" },
+      { "<leader>xT", "<cmd>TodoTrouble keywords=TODO,FIX,FIXME<cr>", desc = "Todo/Fix/Fixme (Trouble)" },
+      { "<leader>st", "<cmd>TodoTelescope<cr>", desc = "Todo" },
+      { "<leader>sT", "<cmd>TodoTelescope keywords=TODO,FIX,FIXME<cr>", desc = "Todo/Fix/Fixme" },
+    },
+  },
+
+  {
+    "p00f/clangd_extensions.nvim",
+    lazy = true,
+    config = function() end,
+    opts = {
+      extensions = {
+        inlay_hints = {
+          inline = false,
+        },
+        ast = {
+          --These require codicons (https://github.com/microsoft/vscode-codicons)
+          role_icons = {
+            type = "",
+            declaration = "",
+            expression = "",
+            specifier = "",
+            statement = "",
+            ["template argument"] = "",
+          },
+          kind_icons = {
+            Compound = "",
+            Recovery = "",
+            TranslationUnit = "",
+            PackExpansion = "",
+            TemplateTypeParm = "",
+            TemplateTemplateParm = "",
+            TemplateParamObject = "",
+          },
+        },
+      },
+    },
+  },
+
+  {
+    "jose-elias-alvarez/null-ls.nvim",
+    opts = function(_, opts)
+      local nls = require("null-ls")
+      opts.sources = opts.sources or {}
+      vim.list_extend(opts.sources, {
+        nls.builtins.diagnostics.cmake_lint,
+      })
+      if type(opts.sources) == "table" then
+        local nls = require("null-ls")
+        vim.list_extend(opts.sources, {
+          nls.builtins.code_actions.gomodifytags,
+          nls.builtins.code_actions.impl,
+          nls.builtins.formatting.gofumpt,
+          nls.builtins.formatting.goimports_reviser,
+        })
+      end
+    end,
+  },
+
+  {
+    "Civitasv/cmake-tools.nvim",
+    opts = {},
+    event = "BufRead",
+  },
+
+  {
+    "mfussenegger/nvim-dap",
+    optional = true,
+    dependencies = {
+      {
+        "mason.nvim",
+        opts = function(_, opts)
+          opts.ensure_installed = opts.ensure_installed or {}
+          vim.list_extend(opts.ensure_installed, { "gomodifytags", "impl", "gofumpt", "goimports-reviser", "delve" })
+        end,
+      },
+      {
+        "leoluz/nvim-dap-go",
+        config = true,
+      },
+      {
+        "mfussenegger/nvim-dap-python",
+        -- stylua: ignore
+        keys = {
+          { "<leader>dPt", function() require('dap-python').test_method() end, desc = "Debug Method" },
+          { "<leader>dPc", function() require('dap-python').test_class() end, desc = "Debug Class" },
+        },
+        config = function()
+          local path = require("mason-registry").get_package("debugpy"):get_install_path()
+          require("dap-python").setup(path .. "/venv/bin/python")
+        end,
+      },
+      {
+        "williamboman/mason.nvim",
+        optional = true,
+        opts = function(_, opts)
+          if type(opts.ensure_installed) == "table" then
+            vim.list_extend(opts.ensure_installed, { "codelldb" })
+          end
+        end,
+      }
+    },
+  },
+  {
+    "leoluz/nvim-dap-go",
+    config = true,
+  },
+
+  {
+    "nvim-neotest/neotest",
+    optional = true,
+    dependencies = {
+      "nvim-neotest/neotest-go",
+      "nvim-neotest/neotest-python",
+    },
+    opts = {
+      adapters = {
+        ["neotest-go"] = {
+          -- Here we can set options for neotest-go, e.g.
+          -- args = { "-tags=integration" }
+        },
+        ["neotest-python"] = {
+          -- Here you can specify the settings for the adapter, i.e.
+          -- runner = "pytest",
+          -- python = ".venv/bin/python",
+        },
+      },
+    },
+  },
+
+  {
+    "nvim-neotest/neotest-python",
+  },
+
+  {
+    "mfussenegger/nvim-dap-python",
+    -- stylua: ignore
+    keys = {
+      { "<leader>dPt", function() require('dap-python').test_method() end, desc = "Debug Method" },
+      { "<leader>dPc", function() require('dap-python').test_class() end, desc = "Debug Class" },
+    },
+    config = function()
+      local path = require("mason-registry").get_package("debugpy"):get_install_path()
+      require("dap-python").setup(path .. "/venv/bin/python")
+    end,
+  },
+  {
+    "linux-cultist/venv-selector.nvim",
+    cmd = "VenvSelect",
+    opts = {},
+    keys = { { "<leader>cv", "<cmd>:VenvSelect<cr>", desc = "Select VirtualEnv" } },
+  },
+
 }
