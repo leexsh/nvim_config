@@ -35,8 +35,7 @@ return {
     "akinsho/bufferline.nvim",
     tag = "v3.*",
     config = function()
-        vim.g.termguicolors = true
-
+        vim.opt.termguicolors = true
         require("bufferline").setup()
     end,
   },
@@ -357,18 +356,6 @@ return {
   { import = "lazyvim.plugins.extras.lang.json" },
 
   -- add any tools you want to have installed below
-  {
-    "williamboman/mason.nvim",
-    opts = {
-      ensure_installed = {
-        "stylua",
-        "shellcheck",
-        "shfmt",
-        "flake8",
-      },
-    },
-  },
-
   -- Use <tab> for completion and snippets (supertab)
   -- first: disable default <tab> and <s-tab> behavior in LuaSnip
   {

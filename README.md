@@ -41,3 +41,7 @@ Refer to the [documentation](https://lazyvim.github.io/installation) to get star
     nvim --version
     ```
     如果成功安装，会显示 Neovim 的版本信息。
+
+```bash
+git clone https://github.com/xxx ~/.config/nvim
+```
