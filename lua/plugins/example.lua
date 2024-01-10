@@ -25,9 +25,6 @@ return {
     dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = {
       use_diagnostic_signs = true
-     -- your configuration comes here
-     -- or leave it empty to use the default settings
-     -- refer to the configuration section below
     },
     enabled = true
   },
@@ -57,11 +54,6 @@ return {
     "hrsh7th/nvim-cmp",
     dependencies = { "hrsh7th/cmp-emoji" },
     ---@param opts cmp.ConfigSchema
-    opts = function(_, opts)
-      local cmp = require("cmp")
-      opts.sources = cmp.config.sources(vim.list_extend(opts.sources, { { name = "emoji" } }))
-    end,
-     ---@param opts cmp.ConfigSchema
     opts = function(_, opts)
       local cmp = require("cmp")
       opts.sources = cmp.config.sources(vim.list_extend(opts.sources, { { name = "emoji" } }))
@@ -150,7 +142,6 @@ return {
       servers = {
         -- tsserver will be automatically installed with mason and loaded with lspconfig
         tsserver = {},
-        neocmake = {},
         pyright = {},
         ruff_lsp = {},
         gopls = {
@@ -295,7 +286,6 @@ return {
         "json",
         "lua",
         "markdown",
-        "markdown_inline",
         "python",
         "query",
         "regex",
@@ -311,23 +301,17 @@ return {
         "gomod",
         "gowork",
         "gosum",
+        "typescript",
       },
     },
+    opts = function (_, opts)
+      
+    end
   },
 
   -- since `vim.tbl_deep_extend`, can only merge tables and not lists, the code above
   -- would overwrite `ensure_installed` with the new value.
   -- If you'd rather extend the default config, use the code below instead:
-  {
-    "nvim-treesitter/nvim-treesitter",
-    opts = function(_, opts)
-      -- add tsx and treesitter
-      vim.list_extend(opts.ensure_installed, {
-        "tsx",
-        "typescript",
-      })
-    end,
-  },
 
   -- the opts function can also be used to change the default opts:
   {
@@ -338,16 +322,6 @@ return {
     end,
   },
 
-  -- or you can return new options to override all the defaults
-  -- {
-  --   "nvim-lualine/lualine.nvim",
-  --   event = "VeryLazy",
-  --   opts = function()
-  --     return {
-  --       --[[add your custom lualine config here]]
-  --     }
-  --   end,
-  -- },
 
   -- use mini.starter instead of alpha
   { import = "lazyvim.plugins.extras.ui.mini-starter" },
@@ -359,10 +333,7 @@ return {
   -- Use <tab> for completion and snippets (supertab)
   -- first: disable default <tab> and <s-tab> behavior in LuaSnip
   {
-    "L3MON4D3/LuaSnip",
-    keys = function()
-      return {}
-    end,
+    import = "L3MON4D3/LuaSnip"
   },
 
   -- mini surround
@@ -636,18 +607,6 @@ return {
         config = true,
       },
       {
-        "mfussenegger/nvim-dap-python",
-        -- stylua: ignore
-        keys = {
-          { "<leader>dPt", function() require('dap-python').test_method() end, desc = "Debug Method" },
-          { "<leader>dPc", function() require('dap-python').test_class() end, desc = "Debug Class" },
-        },
-        config = function()
-          local path = require("mason-registry").get_package("debugpy"):get_install_path()
-          require("dap-python").setup(path .. "/venv/bin/python")
-        end,
-      },
-      {
         "williamboman/mason.nvim",
         optional = true,
         opts = function(_, opts)
@@ -678,23 +637,6 @@ return {
         },
       },
     },
-  },
-
-  {
-    "nvim-neotest/neotest-python",
-  },
-
-  {
-    "mfussenegger/nvim-dap-python",
-    -- stylua: ignore
-    keys = {
-      { "<leader>dPt", function() require('dap-python').test_method() end, desc = "Debug Method" },
-      { "<leader>dPc", function() require('dap-python').test_class() end, desc = "Debug Class" },
-    },
-    config = function()
-      local path = require("mason-registry").get_package("debugpy"):get_install_path()
-      require("dap-python").setup(path .. "/venv/bin/python")
-    end,
   },
   {
     "linux-cultist/venv-selector.nvim",
